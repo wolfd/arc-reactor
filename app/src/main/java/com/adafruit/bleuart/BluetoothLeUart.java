@@ -7,6 +7,7 @@ import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattDescriptor;
 import android.content.Context;
+import android.util.Log;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -20,6 +21,8 @@ import java.lang.String;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class BluetoothLeUart extends BluetoothGattCallback implements BluetoothAdapter.LeScanCallback {
+
+    public static final String TAG = "BluetoothLeUart";
 
     // UUIDs for UART service and associated characteristics.
     public static UUID UART_UUID = UUID.fromString("6E400001-B5A3-F393-E0A9-E50E24DCCA9E");
@@ -100,9 +103,14 @@ public class BluetoothLeUart extends BluetoothGattCallback implements BluetoothA
             return "";
         }
         StringBuilder sb = new StringBuilder();
-        sb.append("Manufacturer : " + disManuf.getStringValue(0) + "\n");
-        sb.append("Model        : " + disModel.getStringValue(0) + "\n");
-        sb.append("Firmware     : " + disSWRev.getStringValue(0) + "\n");
+        try {
+            sb.append("Manufacturer : " + disManuf.getStringValue(0) + "\n");
+            sb.append("Model        : " + disModel.getStringValue(0) + "\n");
+            sb.append("Firmware     : " + disSWRev.getStringValue(0) + "\n");
+        } catch (Exception e) {
+            sb.append("An exception was caught trying to get device info : " + e.getMessage() + "\n");
+        }
+
         return sb.toString();
     };
 
@@ -219,17 +227,22 @@ public class BluetoothLeUart extends BluetoothGattCallback implements BluetoothA
         disHWRev = gatt.getService(DIS_UUID).getCharacteristic(DIS_HWREV_UUID);
         disSWRev = gatt.getService(DIS_UUID).getCharacteristic(DIS_SWREV_UUID);
 
-        // Add device information characteristics to the read queue
-        // These need to be queued because we have to wait for the response to the first
-        // read request before a second one can be processed (which makes you wonder why they
-        // implemented this with async logic to begin with???)
-        readQueue.offer(disManuf);
-        readQueue.offer(disModel);
-        readQueue.offer(disHWRev);
-        readQueue.offer(disSWRev);
+        try {
+            // Add device information characteristics to the read queue
+            // These need to be queued because we have to wait for the response to the first
+            // read request before a second one can be processed (which makes you wonder why they
+            // implemented this with async logic to begin with???)
+            readQueue.offer(disManuf);
+            readQueue.offer(disModel);
+            readQueue.offer(disHWRev);
+            readQueue.offer(disSWRev);
 
-        // Request a dummy read to get the device information queue going
-        gatt.readCharacteristic(disManuf);
+            // Request a dummy read to get the device information queue going
+            gatt.readCharacteristic(disManuf);
+        } catch (Exception e) {
+            Log.d(TAG, "Could not get hardware information.", e);
+        }
+
 
         // Setup notifications on RX characteristic changes (i.e. data received).
         // First call setCharacteristicNotification to enable notification.

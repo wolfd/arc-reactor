@@ -13,12 +13,13 @@ android {
     }
     buildTypes {
         release {
-            runProguard false
+            minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
 }
 
 dependencies {
+    compile 'com.larswerkman:HoloColorPicker:1.5'
     compile fileTree(dir: 'libs', include: ['*.jar'])
 }

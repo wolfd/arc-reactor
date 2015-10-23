@@ -3,6 +3,7 @@ package com.adafruit.bleuart;
 import android.app.Activity;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGattCharacteristic;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.text.method.ScrollingMovementMethod;
 import android.view.Menu;
@@ -13,18 +14,22 @@ import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.TextView;
 
+import com.larswerkman.holocolorpicker.ColorPicker;
+
 import java.lang.Thread;
 
-public class MainActivity extends Activity implements BluetoothLeUart.Callback {
+public class MainActivity extends Activity implements BluetoothLeUart.Callback, ColorPicker.OnColorChangedListener {
 
     // UI elements
     private TextView messages;
     private EditText input;
     private Button   send;
-    private CheckBox newline;
 
     // Bluetooth LE UART instance.  This is defined in BluetoothLeUart.java.
     private BluetoothLeUart uart;
+
+    // For color picker
+    private ColorPicker picker;
 
     // Write some text to the messages text view.
     // Care is taken to do this on the main UI thread so writeLine can be called from any thread
@@ -39,11 +44,12 @@ public class MainActivity extends Activity implements BluetoothLeUart.Callback {
         });
     }
 
-    // Handler for mouse click on the send button.
-    public void sendClick(View view) {
-        StringBuilder stringBuilder = new StringBuilder();
-        String message = input.getText().toString();
+    private void sendSolidColor(int r, int g, int b) {
+        uart.send(new byte[]{0, (byte)r, (byte)g, (byte)b});
+    }
 
+    private void sendData(String message) {
+        StringBuilder stringBuilder = new StringBuilder();
         // We can only send 20 bytes per packet, so break longer messages
         // up into 20 byte payloads
         int len = message.length();
@@ -61,13 +67,10 @@ public class MainActivity extends Activity implements BluetoothLeUart.Callback {
             }
             uart.send(stringBuilder.toString());
         }
-        // Terminate with a newline character if requests
-        newline = (CheckBox) findViewById(R.id.newline);
-        if (newline.isChecked()) {
-            stringBuilder.setLength(0);
-            stringBuilder.append("\n");
-            uart.send(stringBuilder.toString());
-        }
+    }
+
+    public void sendDefaultColor(View view) {
+        sendSolidColor(0, 70, 255);
     }
 
     @Override
@@ -77,18 +80,22 @@ public class MainActivity extends Activity implements BluetoothLeUart.Callback {
 
         // Grab references to UI elements.
         messages = (TextView) findViewById(R.id.messages);
-        input = (EditText) findViewById(R.id.input);
 
         // Initialize UART.
         uart = new BluetoothLeUart(getApplicationContext());
 
         // Disable the send button until we're connected.
-        send = (Button)findViewById(R.id.send);
+        send = (Button)findViewById(R.id.defaultColor);
         send.setClickable(false);
         send.setEnabled(false);
 
         // Enable auto-scroll in the TextView
         messages.setMovementMethod(new ScrollingMovementMethod());
+
+        // Get color picker set up
+        picker = (ColorPicker) findViewById(R.id.picker);
+        picker.setOnColorChangedListener(this);
+        picker.setShowOldCenterColor(false);
     }
 
     // OnCreate, called once to initialize the activity.
@@ -137,7 +144,7 @@ public class MainActivity extends Activity implements BluetoothLeUart.Callback {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                send = (Button)findViewById(R.id.send);
+                send = (Button)findViewById(R.id.defaultColor);
                 send.setClickable(true);
                 send.setEnabled(true);
             }
@@ -151,7 +158,7 @@ public class MainActivity extends Activity implements BluetoothLeUart.Callback {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                send = (Button)findViewById(R.id.send);
+                send = (Button)findViewById(R.id.defaultColor);
                 send.setClickable(false);
                 send.setEnabled(false);
             }
@@ -166,7 +173,7 @@ public class MainActivity extends Activity implements BluetoothLeUart.Callback {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                send = (Button)findViewById(R.id.send);
+                send = (Button)findViewById(R.id.defaultColor);
                 send.setClickable(false);
                 send.setEnabled(false);
             }
@@ -189,5 +196,15 @@ public class MainActivity extends Activity implements BluetoothLeUart.Callback {
     @Override
     public void onDeviceInfoAvailable() {
         writeLine(uart.getDeviceInfo());
+    }
+
+    @Override
+    public void onColorChanged(int argb) {
+        int b = (argb)&0xFF;
+        int g = (argb>>8)&0xFF;
+        int r = (argb>>16)&0xFF;
+        int a = (argb>>24)&0xFF;
+        writeLine(r + "," + g + "," + b);
+        sendSolidColor(r, g, b);
     }
 }
